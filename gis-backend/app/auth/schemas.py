@@ -1,22 +1,20 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, Literal
+from typing import Optional
 from enum import Enum
 
 class RoleEnum(str, Enum):
+    admin = "Admin"
     surveyor = "Surveyor"
     qc = "QC"
-    admin = "Admin"
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str  # Plaintext for now (demo only)
 
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 class UserInfo(BaseModel):
-    id: str
-    email: EmailStr
+    sub: str
     role: Optional[RoleEnum] = None
-    name: Optional[str] = None

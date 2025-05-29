@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.database import engine, Base
 from app.api.routes import (
+    auth,
     ward_master,
     mohalla_master,
     survey_details,
@@ -38,6 +39,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router)
 app.include_router(ward_master.router)
 app.include_router(mohalla_master.router)
 app.include_router(survey_details.router)

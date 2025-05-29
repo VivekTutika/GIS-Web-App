@@ -1,44 +1,31 @@
 import os
-import requests
+from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt
+import jwt  # PyJWT
 from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-JWKS_URL = f"{SUPABASE_URL}/auth/v1/keys"
+JWT_SECRET = os.getenv("JWT_SECRET_KEY", "top_secret_key")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 security = HTTPBearer()
 
-# Fetch and cache the JSON Web Key Set
-def get_jwks():
-    response = requests.get(JWKS_URL)
-    if response.status_code != 200:
-        raise Exception("Failed to fetch JWKS")
-    return response.json()["keys"]
+# Create JWT
+def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=1)):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
 
-JWKS = get_jwks()
-
+# Verify and decode JWT
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     token = credentials.credentials
-
     try:
-        # Get the header to identify the right key
-        header = jwt.get_unverified_header(token)
-        key = next((k for k in JWKS if k["kid"] == header["kid"]), None)
-        if key is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth key")
-
-        # Verify and decode the token
-        payload = jwt.decode(
-            token,
-            key=key["x5c"][0],
-            algorithms=["RS256"],
-            options={"verify_aud": False},  # Supabase JWT doesn't use audience by default
-            issuer=f"{SUPABASE_URL}/auth/v1"
-        )
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Token verification failed: {str(e)}")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
